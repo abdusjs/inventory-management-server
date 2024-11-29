@@ -3,57 +3,69 @@ import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { generateTokens } from "../utils/generateTokens.js";
 import jwt from "jsonwebtoken";
- 
+import EmailSend from "../utils/EmailHelper.js";
+
 const registerUserService = async (req) => {
-  const { firstName, lastName, email, password } = req.body;
+  try {
+    const { firstName, lastName, email, password } = req.body;
 
-  // Validate required fields
-  if (
-    [firstName, lastName, email, password].some((field) => field?.trim() === "")
-  ) {
-    throw new ApiError(400, "All fields are required");
-  }
-
-  // Check for existing user by email
-  const existedUser = await User.findOne({ email: email.toLowerCase() });
-
-  if (existedUser) {
-    throw new ApiError(409, "User with this email or username already exists");
-  }
-
-  // Get file paths
-  const avatarLocalPath = req.files?.avatar?.[0]?.path;
-
-  // Upload avatar
-  let avatar;
-  if (avatarLocalPath) {
-    avatar = await uploadOnCloudinary(avatarLocalPath);
-    if (!avatar) {
-      throw new ApiError(400, "Avatar upload failed");
+    // Validate required fields
+    if (
+      [firstName, lastName, email, password].some(
+        (field) => !field?.trim() // Ensure the field exists and isn't just whitespace
+      )
+    ) {
+      throw new ApiError(400, "All fields are required");
     }
-  } else {
-    throw new ApiError(400, "Avatar file is required");
+
+    // Check for existing user by email (case-insensitive)
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
+      throw new ApiError(409, "User with this email already exists");
+    }
+
+    // Create the user
+    const user = await User.create({
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      email: email.toLowerCase().trim(),
+      password, // Ensure password is hashed before saving
+    });
+
+    // Generate OTP and set expiration (using the method from the model)
+    const otp = user.generateOtp(); // This will generate OTP and set otpExpires
+
+    // Update the user with OTP and expiration using updateOne
+    await User.updateOne(
+      { _id: user._id }, // Filter by user ID
+      { otp, otpExpires: user.otpExpires } // Update OTP and otpExpires fields
+    );
+
+    // Fetch the created user without sensitive fields
+    const createdUser = await User.findById(user._id).select(
+      "-password -refreshToken -otp -otpExpires"
+    );
+
+    if (!createdUser) {
+      throw new ApiError(500, "Failed to create user");
+    }
+
+    // Send email
+    const subject = "Email Verification";
+    const text = `Your email verification code is: ${otp}. It will expire in 5 minutes.`;
+    await EmailSend(email, subject, text);
+
+    return createdUser;
+  } catch (error) {
+    // Centralize error handling for debugging and user feedback
+    console.error("Error in registerUserService:", error);
+
+    if (error instanceof ApiError) {
+      throw error; // Re-throw custom API errors
+    } else {
+      throw new ApiError(500, "Internal server error");
+    }
   }
-
-  // Create the user
-  const user = await User.create({
-    firstName,
-    lastName,
-    avatar: avatar.url,
-    email: email.toLowerCase(),
-    password,
-  });
-
-  // Fetch the created user without sensitive fields
-  const createdUser = await User.findById(user._id).select(
-    "-password -refreshToken"
-  );
-
-  if (!createdUser) {
-    throw new ApiError(500, "Something went wrong when registering the user");
-  }
-
-  return createdUser;
 };
 
 const loginUserService = async (req) => {
@@ -74,6 +86,58 @@ const loginUserService = async (req) => {
   const { accessToken, refreshToken } = tokens;
 
   return { user, accessToken, refreshToken };
+};
+
+const updateUserService = async (req) => {
+  const { firstName, lastName, email, password } = req.body;
+
+  // Validate required fields
+  if (
+    [firstName, lastName, email, password].some((field) => field?.trim() === "")
+  ) {
+    throw new ApiError(400, "All fields are required");
+  }
+
+  // Check for existing user by email
+  const existedUser = await User.findOne({ email: email.toLowerCase() });
+
+  if (existedUser) {
+    throw new ApiError(409, "User with this email or username already exists");
+  }
+
+  // Get file paths
+  // const avatarLocalPath = req.files?.avatar?.[0]?.path;
+
+  // Upload avatar
+  // let avatar;
+  // if (avatarLocalPath) {
+  //   avatar = await uploadOnCloudinary(avatarLocalPath);
+  //   if (!avatar) {
+  //     throw new ApiError(400, "Avatar upload failed");
+  //   }
+  // } else {
+  //   throw new ApiError(400, "Avatar file is required");
+  // }
+
+  // Create the user
+  const user = await User.create({
+    firstName,
+    lastName,
+    // avatar: avatar.url,
+    email: email.toLowerCase(),
+    password,
+  });
+
+  // Fetch the created user without sensitive fields
+  const createdUser = await User.findById(user._id).select(
+    "-password -refreshToken"
+  );
+
+  if (!createdUser) {
+    throw new ApiError(500, "Something went wrong when registering the user");
+  }
+
+  return createdUser;
 };
 
 const refreshAccessTokenService = async (req) => {
@@ -110,4 +174,9 @@ const refreshAccessTokenService = async (req) => {
   }
 };
 
-export { registerUserService, loginUserService, refreshAccessTokenService };
+export {
+  registerUserService,
+  loginUserService,
+  refreshAccessTokenService,
+  updateUserService,
+};

@@ -16,6 +16,53 @@ const registerUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(201, createdUser, "User created successfully"));
 });
 
+const emailVerification = asyncHandler(async (req, res) => {
+  try {
+    const { otp } = req.body;
+
+    // Validate required fields
+    if (!otp?.trim()) {
+      throw new ApiError(400, "OTP is required");
+    }
+
+    // Find user by OTP and check expiration
+    const user = await User.findOne({ otp });
+    if (!user || user.otpExpires < Date.now()) {
+      throw new ApiError(400, "Invalid or expired OTP");
+    }
+
+    // Update user: clear OTP and set status to active
+    await User.updateOne(
+      { _id: user._id },
+      { $set: { otp: null, otpExpires: null, status: "active" } }
+    );
+
+    // Fetch the updated user without sensitive fields
+    const verifiedUser = await User.findById(user._id).select(
+      "-password -otp -otpExpires -refreshToken"
+    );
+
+    if (!verifiedUser) {
+      throw new ApiError(500, "Failed to fetch the verified user");
+    }
+
+    // Return success response
+    return res
+      .status(200)
+      .json(new ApiResponse(200, verifiedUser, "OTP verification successful"));
+  } catch (error) {
+    console.error("Error during OTP verification:", error);
+
+    if (error instanceof ApiError) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
+
+    return res.status(500).json({
+      message: "An unexpected error occurred during OTP verification",
+    });
+  }
+});
+
 const loginUser = asyncHandler(async (req, res) => {
   const { user, accessToken, refreshToken } = await loginUserService(req);
 
@@ -102,4 +149,11 @@ const getUser = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiResponse(200, userData, "success"));
 });
 
-export { registerUser, loginUser, logoutUser, refreshAccessToken, getUser };
+export {
+  registerUser,
+  loginUser,
+  logoutUser,
+  refreshAccessToken,
+  getUser,
+  emailVerification,
+};

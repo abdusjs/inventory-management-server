@@ -55,7 +55,9 @@ const userSchema = new Schema(
         "Please provide a valid contact number",
       ],
     },
-    shippingAddress: String,
+    shippingAddress: {
+      type: String,
+    },
     imageURL: {
       type: String,
       validate: [validator.isURL, "Please provide a valid URL"],
@@ -65,11 +67,27 @@ const userSchema = new Schema(
       default: "inactive",
       enum: ["active", "inactive", "blocked"],
     },
-    confirmationToken: String,
-    confirmationTokenExpires: Date,
-    passwordChangeAt: Date,
-    passwordResetToken: String,
-    passwordResetExpires: Date,
+    otp: {
+      type: String,
+    },
+    otpExpires: {
+      type: Date,
+    },
+    confirmationToken: {
+      type: String,
+    },
+    confirmationTokenExpires: {
+      type: Date,
+    },
+    passwordChangeAt: {
+      type: Date,
+    },
+    passwordResetToken: {
+      type: String,
+    },
+    passwordResetExpires: {
+      type: Date,
+    },
     refreshToken: {
       type: String,
     },
@@ -79,6 +97,25 @@ const userSchema = new Schema(
     versionKey: false,
   }
 );
+
+// Generate otp and set time 5 minutes
+userSchema.methods.generateOtp = function () {
+  const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
+  this.otp = otp;
+  this.otpExpires = new Date(Date.now() + 5 * 60 * 1000); // Expires in 5 minutes
+  return otp;
+};
+
+// Validate otp
+userSchema.methods.verifyOtp = function (enteredOtp) {
+  if (this.otp !== enteredOtp) {
+    return { success: false, message: "Invalid OTP" };
+  }
+  if (this.otpExpires < Date.now()) {
+    return { success: false, message: "OTP has expired" };
+  }
+  return { success: true, message: "OTP is valid" };
+};
 
 // Convert role to lower case if it is in camel case
 userSchema.pre("save", function (next) {

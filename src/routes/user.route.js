@@ -7,6 +7,7 @@ import {
   logoutUser,
   refreshAccessToken,
   getUser,
+  emailVerification,
 } from "../controllers/user.controller.js";
 
 const router = Router();
@@ -21,7 +22,7 @@ router.route("/register").post(
   ]),
   registerUser
 );
-
+router.route("/otp-verification").post(emailVerification)
 router.route("/login").post(loginUser);
 router.route("/refresh-token").post(refreshAccessToken);
 
