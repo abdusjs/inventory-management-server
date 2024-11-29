@@ -1,0 +1,35 @@
+# Ignore build directories
+dist/
+build/
+out/
+
+# Ignore IDE configurations
+.vscode/
+
+# Ignore dotenv files
+*.env
+.env
+.env.*
+
+# Ignore node modules
+node_modules/
+
+# Ignore static assets
+*.svg
+*.png
+*.jpg
+*.gif
+*.jpeg
+
+# Ignore legacy code
+legacy/
+
+# Ignore test files
+*.test.js
+*.spec.js
+
+# Ignore configuration files
+.prettierrc
+.babelrc
+package.json
+tsconfig.json  # If you're using TypeScript
