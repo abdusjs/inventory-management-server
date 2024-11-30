@@ -9,6 +9,9 @@ const registerUserService = async (req) => {
   try {
     const { firstName, lastName, email, password } = req.body;
 
+    const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
+    const otpExpires = new Date(Date.now() + 5 * 60 * 1000); // Expires in 5 minutes
+
     // Validate required fields
     if (
       [firstName, lastName, email, password].some(
@@ -30,16 +33,9 @@ const registerUserService = async (req) => {
       lastName: lastName.trim(),
       email: email.toLowerCase().trim(),
       password, // Ensure password is hashed before saving
+      otp,
+      otpExpires,
     });
-
-    // Generate OTP and set expiration (using the method from the model)
-    const otp = user.generateOtp(); // This will generate OTP and set otpExpires
-
-    // Update the user with OTP and expiration using updateOne
-    await User.updateOne(
-      { _id: user._id }, // Filter by user ID
-      { otp, otpExpires: user.otpExpires } // Update OTP and otpExpires fields
-    );
 
     // Fetch the created user without sensitive fields
     const createdUser = await User.findById(user._id).select(
@@ -57,7 +53,6 @@ const registerUserService = async (req) => {
 
     return createdUser;
   } catch (error) {
-    // Centralize error handling for debugging and user feedback
     console.error("Error in registerUserService:", error);
 
     if (error instanceof ApiError) {
@@ -71,17 +66,36 @@ const registerUserService = async (req) => {
 const loginUserService = async (req) => {
   const { email, password } = req.body;
 
+  // Find user by email
   const user = await User.findOne({ email });
 
   if (!user) {
     throw new ApiError(404, "User does not exist");
   }
 
+  // Check if user is active
+  if (user.status !== "active") {
+    if (user.status === "inactive") {
+      throw new ApiError(
+        403,
+        "Your account is inactive. Please activate your account."
+      );
+    }
+    if (user.status === "blocked") {
+      throw new ApiError(
+        403,
+        "Your account is blocked. Contact support for assistance."
+      );
+    }
+  }
+
+  // Validate password
   const isPasswordValid = await user.isValidPassword(password);
   if (!isPasswordValid) {
     throw new ApiError(401, "Invalid user credentials");
   }
 
+  // Generate tokens for active users
   const tokens = await generateTokens(user._id);
   const { accessToken, refreshToken } = tokens;
 
@@ -89,55 +103,50 @@ const loginUserService = async (req) => {
 };
 
 const updateUserService = async (req) => {
-  const { firstName, lastName, email, password } = req.body;
+  try {
+    const { firstName, lastName, contactNumber, shippingAddress } = req.body;
 
-  // Validate required fields
-  if (
-    [firstName, lastName, email, password].some((field) => field?.trim() === "")
-  ) {
-    throw new ApiError(400, "All fields are required");
+    const avatarFile = req.files?.avatar?.[0]?.path;
+
+    // Find user by ID
+    const user = await User.findById(req?.user?._id);
+    if (!user) {
+      throw new ApiError(404, "User not found");
+    }
+
+    // Update other fields if provided
+    if (firstName) user.firstName = firstName.trim();
+    if (lastName) user.lastName = lastName.trim();
+    if (contactNumber) user.contactNumber = contactNumber.trim();
+    if (shippingAddress) user.shippingAddress = shippingAddress.trim();
+
+    // Handle avatar upload
+    if (avatarFile) {
+      const avatarUpload = await uploadOnCloudinary(avatarFile);
+      if (!avatarUpload) {
+        throw new ApiError(500, "Avatar upload failed");
+      }
+      user.avatar = avatarUpload.url;
+    }
+
+    // Save the updated user
+    await user.save({ validateBeforeSave: false });
+
+    // Fetch the updated user without sensitive fields
+    const updatedUser = await User.findById(user._id).select(
+      "-password -refreshToken -otp -otpExpires"
+    );
+
+    return updatedUser;
+  } catch (error) {
+    console.error("Error in updateUserService:", error);
+
+    if (error instanceof ApiError) {
+      throw error; // Re-throw custom API errors
+    } else {
+      throw new ApiError(500, "Internal server error");
+    }
   }
-
-  // Check for existing user by email
-  const existedUser = await User.findOne({ email: email.toLowerCase() });
-
-  if (existedUser) {
-    throw new ApiError(409, "User with this email or username already exists");
-  }
-
-  // Get file paths
-  // const avatarLocalPath = req.files?.avatar?.[0]?.path;
-
-  // Upload avatar
-  // let avatar;
-  // if (avatarLocalPath) {
-  //   avatar = await uploadOnCloudinary(avatarLocalPath);
-  //   if (!avatar) {
-  //     throw new ApiError(400, "Avatar upload failed");
-  //   }
-  // } else {
-  //   throw new ApiError(400, "Avatar file is required");
-  // }
-
-  // Create the user
-  const user = await User.create({
-    firstName,
-    lastName,
-    // avatar: avatar.url,
-    email: email.toLowerCase(),
-    password,
-  });
-
-  // Fetch the created user without sensitive fields
-  const createdUser = await User.findById(user._id).select(
-    "-password -refreshToken"
-  );
-
-  if (!createdUser) {
-    throw new ApiError(500, "Something went wrong when registering the user");
-  }
-
-  return createdUser;
 };
 
 const refreshAccessTokenService = async (req) => {

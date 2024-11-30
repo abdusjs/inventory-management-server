@@ -5,13 +5,17 @@ const { ObjectId } = Schema.Types; // Destructuring ObjectId from Schema.Types
 
 const supplierSchema = new Schema(
   {
-    name: {
+    firstName: {
       type: String,
-      required: [true, "Please provide a name"],
+      required: true,
       trim: true,
-      lowercase: true,
-      minLength: [3, "Name must be at least 3 characters."],
-      maxLength: [100, "Name is too large"],
+      index: true,
+    },
+    lastName: {
+      type: String,
+      required: true,
+      trim: true,
+      index: true,
     },
     email: {
       type: String,

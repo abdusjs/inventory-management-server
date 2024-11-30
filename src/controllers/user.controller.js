@@ -5,6 +5,7 @@ import {
   registerUserService,
   loginUserService,
   refreshAccessTokenService,
+  updateUserService,
 } from "../services/user.service.js";
 import { ApiError } from "../utils/ApiError.js";
 
@@ -67,12 +68,12 @@ const loginUser = asyncHandler(async (req, res) => {
   const { user, accessToken, refreshToken } = await loginUserService(req);
 
   const loggedInUser = await User.findById(user._id).select(
-    "-password -refreshToken"
+    "-password -refreshToken -otp -otpExpires"
   );
 
   const option = {
-    httpOnly: true,
-    secure: true,
+    httpOnly: false,
+    secure: false,
   };
 
   return res
@@ -95,13 +96,13 @@ const loginUser = asyncHandler(async (req, res) => {
 const logoutUser = asyncHandler(async (req, res) => {
   await User.findByIdAndUpdate(
     req.user._id,
-    { $set: { refreshToken: undefined } },
+    { $set: { refreshToken: null } },
     { new: true }
   );
 
   const option = {
-    httpOnly: true,
-    secure: true,
+    httpOnly: false,
+    secure: false,
   };
 
   return res
@@ -143,10 +144,18 @@ const getUser = asyncHandler(async (req, res) => {
   }
 
   const userData = await User.findById(user._id).select(
-    "-password -refreshToken"
+    "-password -refreshToken -otp -otpExpires"
   );
 
   return res.status(200).json(new ApiResponse(200, userData, "success"));
+});
+
+const updateUser = asyncHandler(async (req, res) => {
+  const updatedUser = await updateUserService(req);
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, updatedUser, "User updated successfully"));
 });
 
 export {
@@ -156,4 +165,5 @@ export {
   refreshAccessToken,
   getUser,
   emailVerification,
+  updateUser,
 };

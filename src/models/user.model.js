@@ -57,10 +57,7 @@ const userSchema = new Schema(
     },
     shippingAddress: {
       type: String,
-    },
-    imageURL: {
-      type: String,
-      validate: [validator.isURL, "Please provide a valid URL"],
+      trim: true,
     },
     status: {
       type: String,
@@ -73,21 +70,6 @@ const userSchema = new Schema(
     otpExpires: {
       type: Date,
     },
-    confirmationToken: {
-      type: String,
-    },
-    confirmationTokenExpires: {
-      type: Date,
-    },
-    passwordChangeAt: {
-      type: Date,
-    },
-    passwordResetToken: {
-      type: String,
-    },
-    passwordResetExpires: {
-      type: Date,
-    },
     refreshToken: {
       type: String,
     },
@@ -97,25 +79,6 @@ const userSchema = new Schema(
     versionKey: false,
   }
 );
-
-// Generate otp and set time 5 minutes
-userSchema.methods.generateOtp = function () {
-  const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
-  this.otp = otp;
-  this.otpExpires = new Date(Date.now() + 5 * 60 * 1000); // Expires in 5 minutes
-  return otp;
-};
-
-// Validate otp
-userSchema.methods.verifyOtp = function (enteredOtp) {
-  if (this.otp !== enteredOtp) {
-    return { success: false, message: "Invalid OTP" };
-  }
-  if (this.otpExpires < Date.now()) {
-    return { success: false, message: "OTP has expired" };
-  }
-  return { success: true, message: "OTP is valid" };
-};
 
 // Convert role to lower case if it is in camel case
 userSchema.pre("save", function (next) {
@@ -141,6 +104,11 @@ userSchema.pre("save", async function (next) {
 // Check password validity
 userSchema.methods.isValidPassword = async function (password) {
   return bcrypt.compare(password, this.password);
+};
+
+// Check if user status is active
+userSchema.methods.isActive = function () {
+  return this.status === "active";
 };
 
 // Generate access token
