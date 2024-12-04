@@ -1,9 +1,9 @@
-import { ApiError } from "../utils/ApiError.js";
-import { User } from "../models/user.model.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
-import { generateTokens } from "../utils/generateTokens.js";
 import jwt from "jsonwebtoken";
+import { User } from "../models/user.model.js";
+import { ApiError } from "../utils/ApiError.js";
+import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import EmailSend from "../utils/EmailHelper.js";
+import { generateTokens } from "../utils/generateTokens.js";
 
 const registerUserService = async (req) => {
   try {
@@ -184,8 +184,8 @@ const refreshAccessTokenService = async (req) => {
 };
 
 export {
-  registerUserService,
   loginUserService,
   refreshAccessTokenService,
+  registerUserService,
   updateUserService,
 };
