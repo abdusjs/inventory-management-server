@@ -160,7 +160,43 @@ const updateUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, updatedUser, "User updated successfully"));
 });
 
-const changePassword = asyncHandler(async (req, res) => {});
+const changePassword = asyncHandler(async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+
+  // Validate input
+  if (!oldPassword || !newPassword) {
+    throw new ApiError(400, "Both old and new passwords are required");
+  }
+
+  // Fetch authenticated user
+  const user = await User.findById(req.user?._id);
+  if (!user) {
+    throw new ApiError(404, "User does not exist");
+  }
+
+  // Validate old password
+  const isPasswordValid = await user.isValidPassword(oldPassword);
+  if (!isPasswordValid) {
+    throw new ApiError(401, "Old password did not match");
+  }
+
+  // Check if new password is different from the old password
+  if (oldPassword === newPassword) {
+    throw new ApiError(
+      400,
+      "New password must be different from the old password"
+    );
+  }
+
+  // Update and hash new password
+  user.password = newPassword;
+  await user.save();
+
+  // Return success response
+  return res
+    .status(200)
+    .json(new ApiResponse(200, null, "Password changed successfully"));
+});
 
 const changeEmail = asyncHandler(async (req, res) => {
   const { newEmail, otp, step } = req.body; // Step determines old email or new email verification
@@ -301,7 +337,42 @@ const resetPassword = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, null, "Password reset successfully"));
 });
 
-const deleteUser = asyncHandler(async (req, res) => {});
+const deleteUser = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  // Validate ID
+  if (!id || !User.isIdValid(id)) {
+    throw new ApiError(400, "Invalid user ID");
+  }
+
+  // Fetch user from the database
+  const user = await User.findById(id);
+  if (!user) {
+    throw new ApiError(404, "User does not exist");
+  }
+
+  // Authorization check: allow only self-deletion or admin-level access
+  const isAuthorized =
+    req.user?._id.toString() === id || req.user?.role === "admin";
+  if (!isAuthorized) {
+    throw new ApiError(403, "You are not authorized to delete this user");
+  }
+
+  // Log user data before deletion for auditing
+  // console.log(`Deleting user: ${user._id}, Email: ${user.email}`);
+
+  // Perform user deletion
+  await user.deleteOne();
+
+  // Optional cleanup: remove related resources
+  // await Post.deleteMany({ userId: id });
+  // await Comment.deleteMany({ userId: id });
+
+  // Send success response
+  return res
+    .status(200)
+    .json(new ApiResponse(200, null, "User deleted successfully"));
+});
 
 const resendOtp = asyncHandler(async (req, res) => {
   const { email } = req.params;
