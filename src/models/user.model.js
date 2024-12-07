@@ -1,6 +1,6 @@
-import mongoose, { Schema } from "mongoose";
-import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import mongoose, { Schema } from "mongoose";
 import validator from "validator";
 
 const userSchema = new Schema(
@@ -24,6 +24,9 @@ const userSchema = new Schema(
       lowercase: true,
       trim: true,
       validate: [validator.isEmail, "Please enter a valid email address"],
+    },
+    tempNewEmail: {
+      type: String,
     },
     avatar: {
       type: String,
@@ -123,16 +126,6 @@ userSchema.methods.generateRefreshToken = function () {
   return jwt.sign({ _id: this._id }, process.env.REFRESH_TOKEN_SECRET, {
     expiresIn: process.env.REFRESH_TOKEN_EXPIRY,
   });
-};
-
-// Verify refresh token
-userSchema.methods.verifyRefreshToken = function (token) {
-  try {
-    const decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
-    return decoded._id === this._id.toString();
-  } catch (error) {
-    return false;
-  }
 };
 
 export const User = mongoose.model("User", userSchema);
