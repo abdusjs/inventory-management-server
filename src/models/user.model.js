@@ -114,6 +114,11 @@ userSchema.methods.isActive = function () {
   return this.status === "active";
 };
 
+// Validate MongoDB ObjectId
+userSchema.statics.isIdValid = function (id) {
+  return mongoose.Types.ObjectId.isValid(id);
+};
+
 // Generate access token
 userSchema.methods.generateAccessToken = function () {
   return jwt.sign({ _id: this._id }, process.env.ACCESS_TOKEN_SECRET, {
