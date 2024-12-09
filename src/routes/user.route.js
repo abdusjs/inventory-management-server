@@ -33,7 +33,7 @@ router.route("/profile").get(verifyJWT, getUser);
 router.route("/logout").post(verifyJWT, logoutUser);
 router.route("/change-password").post(verifyJWT, changePassword);
 router.route("/change-email").post(verifyJWT, changeEmail);
-router.route("/delete-account").delete(verifyJWT, deleteUser);
+router.route("/delete-account/:id").delete(verifyJWT, deleteUser);
 router.route("/update-profile").patch(
   verifyJWT,
   upload.fields([
